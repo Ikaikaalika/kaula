@@ -1,0 +1,10 @@
+mlx>=0.31.0
+numpy>=1.26
+jupyter>=1.0
+matplotlib>=3.8
+imageio>=2.34
+pillow>=10.0
+tqdm>=4.66
+pyyaml>=6.0
+torch>=2.2
+pytest>=8.0

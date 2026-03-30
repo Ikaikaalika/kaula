@@ -1,0 +1,24 @@
+# Training/runtime configuration
+runtime: pytorch  # options: pytorch, mlx
+seed: 7
+
+dataset_name: toy  # options: toy, epic_kitchens, ego4d, droid, bridge_data, something_something_v2
+data_root: "/Volumes/Tyler HDD"
+split: train
+sample_stride: 1
+max_episodes: null
+
+batch_size: 8
+num_workers: 0
+learning_rate: 0.0001
+weight_decay: 0.01
+grad_clip_norm: 1.0
+max_steps: 100
+log_interval: 10
+save_interval: 50
+
+lambda_diffusion: 1.0
+lambda_latent_rollout: 1.0
+lambda_reconstruction: 1.0
+lambda_distillation: 0.0
+lambda_contrastive_alignment: 0.0

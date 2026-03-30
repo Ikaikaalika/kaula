@@ -1,0 +1,17 @@
+# Large config scaffold (1B target, 7B-ready architecture placeholder)
+# TODO(phase6): add exact layer scaling and memory-partition strategy.
+model_name: latent_ssm_diffusion_large
+parameter_target: 1000000000
+architecture_ready_target: 7000000000
+
+clip_len: 32
+image_size: 128
+channels: 3
+latent_dim: 1024
+action_dim: 16
+
+encoder_hidden_channels: 192
+decoder_hidden_channels: 384
+
+ssm_backend: s4
+ssm_hidden_dim: 1536

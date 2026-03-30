@@ -1,0 +1,1 @@
+run_name,date,dataset,model,joint_embedding,diffusion,seq_len,image_size,batch_size,latent_mse,recon_loss,rollout_error,throughput,memory_notes,checkpoint_path,notes

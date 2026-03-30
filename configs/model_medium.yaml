@@ -1,0 +1,16 @@
+# Medium config scaffold (~300M target)
+# TODO(phase3): tune depth/width to hit parameter target exactly.
+model_name: latent_ssm_diffusion_medium
+parameter_target: 300000000
+
+clip_len: 16
+image_size: 96
+channels: 3
+latent_dim: 512
+action_dim: 8
+
+encoder_hidden_channels: 128
+decoder_hidden_channels: 256
+
+ssm_backend: mamba
+ssm_hidden_dim: 768

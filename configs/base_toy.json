@@ -1,0 +1,14 @@
+{
+  "dataset_name": "toy",
+  "image_size": 32,
+  "seq_len": 8,
+  "patch_size": 4,
+  "latent_dim": 128,
+  "action_dim": 4,
+  "hidden_dim": 256,
+  "ssm_hidden_dim": 128,
+  "diffusion_hidden_dim": 256,
+  "batch_size": 16,
+  "learning_rate": 0.001,
+  "num_epochs": 5
+}
