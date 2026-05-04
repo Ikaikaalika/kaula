@@ -120,15 +120,23 @@ class LatentStateSpaceDiffusionWorldModel(nn.Module):
         self.decoder = decoder
         self.backend_name = backend_name
 
-    def forward_train(self, frames: torch.Tensor, actions: torch.Tensor) -> Dict[str, torch.Tensor]:
+    def forward_train(
+        self,
+        frames: torch.Tensor,
+        actions: torch.Tensor,
+        teacher_forcing_prob: float = 1.0,
+    ) -> Dict[str, torch.Tensor]:
         """Forward pass for training losses.
 
         Args:
             frames: `[B, T, C, H, W]`
             actions: `[B, T-1, A]`
+            teacher_forcing_prob: probability of using ground-truth `z_t` as the
+                conditioning latent for the next step. Lower values feed the
+                model its own previous prediction (scheduled sampling).
         """
         latents = self.encoder(frames)
-        bsz, steps, latent_dim = latents.shape
+        bsz, steps, _ = latents.shape
         if actions.shape[1] != steps - 1:
             raise ValueError(
                 f"Expected actions with T-1={steps - 1} steps, got shape {tuple(actions.shape)}"
@@ -139,32 +147,50 @@ class LatentStateSpaceDiffusionWorldModel(nn.Module):
         pred_noises = []
         target_noises = []
         hidden_states = []
+        latent_priors = []
+
+        prev_pred = latents[:, 0]
 
         for t in range(steps - 1):
-            z_t = latents[:, t]
+            if teacher_forcing_prob >= 1.0:
+                z_t_cond = latents[:, t]
+            elif teacher_forcing_prob <= 0.0:
+                z_t_cond = prev_pred
+            else:
+                use_truth = torch.rand(bsz, device=latents.device) < teacher_forcing_prob
+                z_t_cond = torch.where(use_truth.unsqueeze(-1), latents[:, t], prev_pred)
+
             z_tp1 = latents[:, t + 1]
             a_t = actions[:, t]
 
-            diffusion_t = self.diffusion.sample_timesteps(bsz, device=frames.device)
+            # Decoupled diffusion timesteps: SSM sees one noise level, denoiser
+            # target sees an independent one. This matches the training
+            # distribution at rollout (see `rollout` below).
+            t_ssm = self.diffusion.sample_timesteps(bsz, device=frames.device)
+            t_target = self.diffusion.sample_timesteps(bsz, device=frames.device)
 
-            input_noise = torch.randn_like(z_t)
-            noisy_z_t = self.diffusion.q_sample(z_t, diffusion_t, noise=input_noise)
-            state, _ = self.core.transition(noisy_z_t, a_t, state)
+            noisy_z_t = self.diffusion.q_sample(z_t_cond, t_ssm)
+            state, latent_prior = self.core.transition(noisy_z_t, a_t, state)
 
             target_noise = torch.randn_like(z_tp1)
-            noisy_target = self.diffusion.q_sample(z_tp1, diffusion_t, noise=target_noise)
-            pred_noise, _ = self.diffusion.denoiser(noisy_target, z_t, state.hidden, diffusion_t)
-            z_tp1_hat = self.diffusion.predict_start_from_noise(noisy_target, diffusion_t, pred_noise)
+            noisy_target = self.diffusion.q_sample(z_tp1, t_target, noise=target_noise)
+            pred_noise, _ = self.diffusion.denoiser(noisy_target, z_t_cond, state.hidden, t_target)
+            z_tp1_hat = self.diffusion.predict_start_from_noise(noisy_target, t_target, pred_noise)
 
             hidden_states.append(state.hidden)
+            latent_priors.append(latent_prior)
             pred_latents.append(z_tp1_hat)
             pred_noises.append(pred_noise)
             target_noises.append(target_noise)
+
+            # Detach to avoid backprop-through-time across the scheduled-sampling mix.
+            prev_pred = z_tp1_hat.detach()
 
         pred_latents_t = torch.stack(pred_latents, dim=1)
         pred_noises_t = torch.stack(pred_noises, dim=1)
         target_noises_t = torch.stack(target_noises, dim=1)
         hidden_states_t = torch.stack(hidden_states, dim=1)
+        latent_priors_t = torch.stack(latent_priors, dim=1)
         decoded = self.decoder(pred_latents_t)
 
         return {
@@ -176,6 +202,7 @@ class LatentStateSpaceDiffusionWorldModel(nn.Module):
             "decoded_frames": decoded,
             "target_frames": frames[:, 1:],
             "hidden_states": hidden_states_t,
+            "latent_prior": latent_priors_t,
         }
 
     @torch.no_grad()
@@ -206,18 +233,17 @@ class LatentStateSpaceDiffusionWorldModel(nn.Module):
         bsz = current.shape[0]
         state = self.core.init_state(batch_size=bsz, device=context_frames.device)
 
-        # Prime hidden state from context trajectory.
+        # Prime hidden state from context trajectory using the same uniform
+        # noise distribution the SSM saw at training time.
         for t in range(latents.shape[1] - 1):
-            diffusion_t = torch.zeros((bsz,), device=context_frames.device, dtype=torch.long)
+            diffusion_t = self.diffusion.sample_timesteps(bsz, device=context_frames.device)
             noisy = self.diffusion.q_sample(latents[:, t], diffusion_t)
             state, _ = self.core.transition(noisy, action_sequence[:, min(t, action_sequence.shape[1] - 1)], state)
 
         sampled_latents = []
         for step in range(rollout_horizon):
             action_t = action_sequence[:, step]
-            diffusion_t = torch.full(
-                (bsz,), self.diffusion.num_steps - 1, device=context_frames.device, dtype=torch.long
-            )
+            diffusion_t = self.diffusion.sample_timesteps(bsz, device=context_frames.device)
             noisy_current = self.diffusion.q_sample(current, diffusion_t)
             state, _ = self.core.transition(noisy_current, action_t, state)
             z_next_samples = self.diffusion.reverse_sample(

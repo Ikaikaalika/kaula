@@ -19,7 +19,6 @@
 
 - Full reverse diffusion training refinements
 - Multi-step latent rollout optimization
-- Unified MLX mode under new architecture modules
 
 ## Phase 4
 

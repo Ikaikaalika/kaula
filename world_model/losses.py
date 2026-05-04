@@ -1,7 +1,8 @@
 """Loss stack for latent state-space diffusion world model.
 
 Total loss:
-    L = lambda1 diffusion + lambda2 latent_rollout + lambda3 reconstruction + lambda4 distillation + lambda5 contrastive
+    L = lambda1 diffusion + lambda2 latent_rollout + lambda3 reconstruction
+        + lambda_prior latent_prior + lambda4 distillation + lambda5 contrastive
 
 Example:
     >>> from world_model.losses import LossWeights, compute_world_model_losses
@@ -25,6 +26,7 @@ class LossWeights:
     diffusion: float = 1.0
     latent_rollout: float = 1.0
     reconstruction: float = 1.0
+    latent_prior: float = 0.5
     distillation: float = 0.0
     contrastive_alignment: float = 0.0
 
@@ -51,6 +53,11 @@ def compute_world_model_losses(outputs: Dict[str, torch.Tensor], weights: LossWe
     latent_rollout_loss = F.mse_loss(outputs["pred_latents"], outputs["target_latents"])
     reconstruction_loss = F.mse_loss(outputs["decoded_frames"], outputs["target_frames"])
 
+    if "latent_prior" in outputs:
+        latent_prior_loss = F.mse_loss(outputs["latent_prior"], outputs["target_latents"])
+    else:
+        latent_prior_loss = torch.zeros((), device=diffusion_loss.device)
+
     if "distill_pred" in outputs and "distill_target" in outputs:
         distillation_loss = F.mse_loss(outputs["distill_pred"], outputs["distill_target"])
     else:
@@ -65,6 +72,7 @@ def compute_world_model_losses(outputs: Dict[str, torch.Tensor], weights: LossWe
         weights.diffusion * diffusion_loss
         + weights.latent_rollout * latent_rollout_loss
         + weights.reconstruction * reconstruction_loss
+        + weights.latent_prior * latent_prior_loss
         + weights.distillation * distillation_loss
         + weights.contrastive_alignment * contrastive_alignment_loss
     )
@@ -74,6 +82,7 @@ def compute_world_model_losses(outputs: Dict[str, torch.Tensor], weights: LossWe
         "diffusion_loss": diffusion_loss,
         "latent_rollout_loss": latent_rollout_loss,
         "reconstruction_loss": reconstruction_loss,
+        "latent_prior_loss": latent_prior_loss,
         "distillation_loss": distillation_loss,
         "contrastive_alignment_loss": contrastive_alignment_loss,
     }

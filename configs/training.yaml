@@ -1,5 +1,4 @@
 # Training/runtime configuration
-runtime: pytorch  # options: pytorch, mlx
 seed: 7
 
 dataset_name: toy  # options: toy, epic_kitchens, ego4d, droid, bridge_data, something_something_v2
@@ -17,8 +16,25 @@ max_steps: 100
 log_interval: 10
 save_interval: 50
 
+# Optimizer / schedule
+lr_warmup_steps: 100
+lr_min_ratio: 0.1
+
+# Mixed precision (only used on CUDA)
+use_amp: true
+
+# Exponential moving average; 0.0 disables.
+ema_decay: 0.999
+
+# Scheduled sampling: linearly decay teacher-forcing probability from 1.0
+# down to `teacher_forcing_min` over `teacher_forcing_decay_steps` steps.
+teacher_forcing_decay_steps: 10000
+teacher_forcing_min: 0.5
+
+# Loss weights
 lambda_diffusion: 1.0
 lambda_latent_rollout: 1.0
 lambda_reconstruction: 1.0
+lambda_latent_prior: 0.5
 lambda_distillation: 0.0
 lambda_contrastive_alignment: 0.0

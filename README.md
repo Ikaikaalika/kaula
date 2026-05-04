@@ -50,10 +50,9 @@ Default dataset root in config: `"/Volumes/Tyler HDD"` (see `configs/training.ya
 - Runtime inference graph does not include teacher models.
 - Temporal operator is state-space diffusion, not transformer-only or diffusion-only.
 
-## Runtime Modes
+## Runtime
 
-- `pytorch` mode: implemented in `training/train.py`.
-- `mlx` prototype mode: delegated to existing `run_demo.py` for Apple Silicon local prototyping; migration to unified architecture is a Phase 3 TODO.
+PyTorch only. The earlier MLX prototype path was removed when scoping the workshop POC for cloud GPU training.
 
 ## Modified Files (Phase 1)
 
@@ -109,7 +108,7 @@ Default dataset root in config: `"/Volumes/Tyler HDD"` (see `configs/training.ya
 ## Next Steps
 
 1. Phase 2: deepen EPIC/Ego4D loading + rollout sampler stress tests.
-2. Phase 3: full reverse sampler training logic and MLX path migration.
+2. Phase 3: full reverse sampler training logic.
 3. Phase 4: teacher-backed distillation pipelines.
 4. Phase 5: full evaluation metric stack and visualization tools.
 5. Phase 6: docs hardening, diagrams, broader test coverage.
